@@ -67,7 +67,11 @@ class RepositoryApp(param.Parameterized):
         except KeyError:
             pri_repos = None
         string = (
-            f"Number public repositories: {pub_repos}\nNumber private repositories: {pri_repos}\nTotal: {pub_repos + pri_repos}"
+            (
+                f"Number public repositories: {pub_repos}\n"
+                f"Number private repositories: {pri_repos}\n"
+                f"Total: {pub_repos + pri_repos}"
+            )
             if pri_repos
             else f"Number public repositories: {pub_repos}"
         )
