@@ -16,27 +16,31 @@ class RepositoryApp(param.Parameterized):
     url = param.String("https://api.github.com")
     _org_name = param.String("GitHub")
     _repo_error = param.String("error")
+    _url_tag = param.String()
+    _headers = param.Dict(dict(Accept="application/vnd.github.v3+json"))
 
-    def _alert(self):
+    @property
+    def url_tag(self):
+        """Compose the url to be requested."""
+        return f"{self.url}/{self._url_tag}"
+
+    @property
+    def headers(self):
+        """Generate the headers of the petition."""
+        return self._headers
+
+    def _alert(self, status_code):
         """Return an error warning when the requested url is not valid."""
-        return print(
-            f"Organization {self._org_name} is not valid. Please, insert a valid organization name."
-        )
+        if status_code >= 400:
+            raise ValueError(
+                f"Organization {self._org_name} is not valid. Please, insert a valid organization name."
+            )
 
-    def _get_requests(self, add_string, **kwargs):
-        """
-        Return the requested url instance.
-
-        This method returns a request response given the url instance attribute
-        and the add_string argument.
-
-        Args:
-            add_string: completes the url string to be requested.
-            kwargs: additional parameters to be introduced inside headers option.
-        """
+    def _get_requests(self):
+        """Return a request response given the url_tag and headers instance properties."""
         org = requests.get(
-            f"{self.url}" + add_string,
-            headers=dict(Accept="application/vnd.github.v3+json", **kwargs),
+            f"{self.url_tag}",
+            headers=self.headers,
         )
         return org
 
@@ -52,30 +56,16 @@ class RepositoryApp(param.Parameterized):
         """
         # Parameters
         self._org_name = org_name
-        add_string = f"/orgs/{self._org_name}"
+        self._url_tag = f"orgs/{self._org_name}"
         # Request
-        org = self._get_requests(add_string=add_string)
+        org = self._get_requests()
         # Check
-        if org.status_code == 404:
-            return self._alert()
+        self._alert(org.status_code)
         # Get dictionary
         resp = org.json()
-        # Get public and private (if any) repositories
+        # Get public repositories
         pub_repos = resp["public_repos"]
-        try:
-            pri_repos = resp["total_private_repos"]
-        except KeyError:
-            pri_repos = None
-        string = (
-            (
-                f"Number public repositories: {pub_repos}\n"
-                f"Number private repositories: {pri_repos}\n"
-                f"Total: {pub_repos + pri_repos}"
-            )
-            if pri_repos
-            else f"Number public repositories: {pub_repos}"
-        )
-        return print(string)
+        return print(f"Number public repositories: {pub_repos}")
 
     def request_biggest_repository(self, org_name):
         """
@@ -89,13 +79,12 @@ class RepositoryApp(param.Parameterized):
         """
         # Parameters
         self._org_name = org_name
-        add_string = f"/orgs/{self._org_name}/repos"
-        kwargs = {"Type": "all"}
+        self._url_tag = f"orgs/{self._org_name}/repos"
+        self._headers["Type"] = "all"
         # Request
-        org = self._get_requests(add_string=add_string, **kwargs)
+        org = self._get_requests()
         # Check
-        if org.status_code == 404:
-            return self._alert()
+        self._alert(org.status_code)
         # Get dictionary
         resp = org.json()
         # Get max size
@@ -104,19 +93,17 @@ class RepositoryApp(param.Parameterized):
             max_size = max(repo["size"], max_size)
             if max_size == repo["size"]:
                 index = ix
-        # size = max([repo['size'] for repo in resp])
-        mult = 1024
         repo_name = resp[index]["name"]
         return print(
-            f"Size biggest repository: {max_size * mult} bytes\nName repository: {repo_name}"
+            f"Size biggest repository: {max_size * 1024} bytes\nName repository: {repo_name}"
         )
 
     def request_number_organization(self):
         """Return the number of organizations that are currently on GitHub."""
         # Parameters
-        add_string = f"/search/users?q=type:org"
+        self._url_tag = f"search/users?q=type:org"
         # Request
-        org = self._get_requests(add_string=add_string)
+        org = self._get_requests()
         # Get dictionary
         resp = org.json()
         total = resp["total_count"]
